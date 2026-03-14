@@ -11,3 +11,11 @@ __pycache__/
 
 # Resources
 resources
+
+# Large assets (use Git LFS if needed)
+*.gif
+*.mp4
+assets/*.png
+
+# Large notebooks with output
+notebooks/
