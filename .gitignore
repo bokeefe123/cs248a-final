@@ -19,4 +19,5 @@ assets/*.png
 
 # Large notebooks with output
 notebooks/
+!notebooks/final_project/
 !notebooks/final_project/portal_angled_45.png
