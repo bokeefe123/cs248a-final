@@ -1,11 +1,29 @@
 implementing "../renderer.slang";
 
 import light;
+import portal;
 
 public struct RayMeshIntersectionResult
 {
     public RayHitResult closestHit;
     public Triangle hitTriangle;
+}
+
+public Optional<Portal.PortalHitResult> rayPortalIntersection(Ray ray, RendererUniform uniforms)
+{
+    Optional<Portal.PortalHitResult> closestPortalHit = Optional<Portal.PortalHitResult>();
+    for (uint i = 0; i < uniforms.portalCount; i++)
+    {
+        Optional<Portal.PortalHitResult> portalHit = uniforms.portalBuf[i].hit(ray, i);
+        if (portalHit.hasValue)
+        {
+            if (!closestPortalHit.hasValue || portalHit.value.t < closestPortalHit.value.t)
+            {
+                closestPortalHit = portalHit;
+            }
+        }
+    }
+    return closestPortalHit;
 }
 
 public Optional<RectangularLight.LightHitResult> rayRectangularLightIntersection(Ray ray, RendererUniform uniforms)

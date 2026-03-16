@@ -21,6 +21,7 @@ public Optional<RayMeshSampleResult> meshSample(float2 uv, RendererUniform unifo
     const float EPSILON = 1e-2;
     bool renderLight = true;
     float distance = 0.0;
+    int portalTransports = 0;
 
     for (int depth = 0; depth < uniforms.pathTraceDepth; depth++)
     {
@@ -29,10 +30,56 @@ public Optional<RayMeshSampleResult> meshSample(float2 uv, RendererUniform unifo
         const int maxGlassBounce = 3;
         for (int i = 0; i < maxGlassBounce; i++)
         {
-            // Step 1: Check if the ray intersects with any rectangular light or mesh.
-            // Use the radiance of whichever one (light source or mesh) that's closer.
+            // Step 1: Check if the ray intersects with any rectangular light, mesh, or portal.
             Optional<RectangularLight.LightHitResult> rayRectangularLightIntersectionResult = rayRectangularLightIntersection(ray, uniforms);
             Optional<RayMeshIntersectionResult> rayMeshIntersectionResult = rayMeshIntersection(ray, uniforms);
+
+            // Portal transport: if a portal is the closest hit, teleport the ray
+            // and re-check intersections (up to maxPortalTransports times per ray path).
+            if (uniforms.portalCount > 0)
+            {
+                bool transportedThroughPortal = true;
+                while (transportedThroughPortal && portalTransports < int(uniforms.maxPortalTransports))
+                {
+                    transportedThroughPortal = false;
+                    Optional<Portal.PortalHitResult> portalHit = rayPortalIntersection(ray, uniforms);
+
+                    if (portalHit.hasValue)
+                    {
+                        float closestNonPortalT = float.maxValue;
+                        if (rayRectangularLightIntersectionResult.hasValue)
+                            closestNonPortalT = min(closestNonPortalT, rayRectangularLightIntersectionResult.value.t);
+                        if (rayMeshIntersectionResult.hasValue)
+                            closestNonPortalT = min(closestNonPortalT, rayMeshIntersectionResult.value.closestHit.t);
+
+                        if (portalHit.value.t < closestNonPortalT)
+                        {
+                            Portal entryPortal = uniforms.portalBuf[portalHit.value.portalIndex];
+                            float glowFactor = entryPortal.getGlowFactor(portalHit.value.localUV);
+
+                            if (glowFactor > 0.0)
+                            {
+                                radiance += throughput * entryPortal.glowColor * entryPortal.glowIntensity * glowFactor;
+                                if (depth == 0)
+                                {
+                                    t = portalHit.value.t;
+                                    normalAtFirstHit = portalHit.value.normal;
+                                }
+                                breakRendering = true;
+                                break;
+                            }
+
+                            Portal exitPortal = uniforms.portalBuf[entryPortal.partnerIndex];
+                            ray = entryPortal.getExitRay(portalHit.value.localUV, ray.direction, exitPortal);
+                            portalTransports++;
+                            transportedThroughPortal = true;
+
+                            rayRectangularLightIntersectionResult = rayRectangularLightIntersection(ray, uniforms);
+                            rayMeshIntersectionResult = rayMeshIntersection(ray, uniforms);
+                        }
+                    }
+                }
+            }
 
             // If the ray does not intersect with any light source or mesh.
             if (!rayRectangularLightIntersectionResult.hasValue && !rayMeshIntersectionResult.hasValue)
@@ -115,16 +162,15 @@ public Optional<RayMeshSampleResult> meshSample(float2 uv, RendererUniform unifo
 
                 // Step 4a: Sample BRDF for the next bounce.
 
-
                 // Step 4b: Update the throughput for the next bounce.
-                
+
                 // Not glass BRDF.
                 if (parameters.brdfType != 2)
                 {
                     // TODO Step 4b: Student implementation starts here.
-                    
+
                     throughput *= sampleBRDFResult.fr * max(dot(sampleBRDFResult.sampledDirection, normal), 0.0) / sampleBRDFResult.sampledPdf;
-                    
+
                     // TODO Step 4b: Student implementation ends here.
 
                     if (max(throughput.x, max(throughput.y, throughput.z)) < 1e-2)

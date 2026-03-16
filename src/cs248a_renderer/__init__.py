@@ -26,6 +26,7 @@ class RendererModules:
     material_module: spy.Module
     primitive_module: spy.Module
     light_module: spy.Module
+    portal_module: spy.Module
     model_module: spy.Module
     renderer_module: spy.Module
 
@@ -53,6 +54,11 @@ class RendererModules:
             device=device,
             path="light.slang",
         )
+        self.portal_module = spy.Module.load_from_file(
+            device=device,
+            path="portal.slang",
+            link=[self.math_module, self.primitive_module],
+        )
         self.model_module = spy.Module.load_from_file(
             device=device,
             path="model.slang",
@@ -77,6 +83,7 @@ class RendererModules:
                 self.model_module,
                 self.utils_module,
                 self.light_module,
+                self.portal_module,
                 self.brdf_module,
             ],
         )

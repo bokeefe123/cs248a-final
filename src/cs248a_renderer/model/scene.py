@@ -15,6 +15,7 @@ from cs248a_renderer.model.scene_object import SceneObject
 from cs248a_renderer.model.mesh import Triangle, Mesh
 from cs248a_renderer.model.material import PhysicsBasedMaterial
 from cs248a_renderer.model.lights import PointLight, DirectionalLight, RectangularLight
+from cs248a_renderer.model.portals import Portal, resolve_partner_indices
 
 
 @dataclass
@@ -66,6 +67,8 @@ class Scene:
     point_lights: List[PointLight] = field(default_factory=list)
     directional_lights: List[DirectionalLight] = field(default_factory=list)
     rectangular_lights: List[RectangularLight] = field(default_factory=list)
+    # Portals
+    portals: List[Portal] = field(default_factory=list)
 
     def __post_init__(self):
         self.lookup[self.root.name] = self.root
@@ -213,6 +216,20 @@ class Scene:
             "rectangular_lights": self._rectangular_lights,
         }
         return lights_dict
+
+    def extract_portals(self):
+        """Extract all portals in the scene from SceneObject."""
+        self._portals = []
+        stack = [self.root]
+        while stack:
+            current = stack.pop(-1)
+            if current is None:
+                continue
+            if type(current) is Portal:
+                self._portals.append(current)
+            stack.extend(current.children)
+        resolve_partner_indices(self._portals)
+        return self._portals
 
     def extract_directional_lights(self):
         """Extract all directional lights in the scene from SceneObject."""

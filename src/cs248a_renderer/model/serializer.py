@@ -29,6 +29,7 @@ from cs248a_renderer.model.lights import (
     DirectionalLight,
     RectangularLight,
 )
+from cs248a_renderer.model.portals import Portal
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,10 @@ class SceneSerializer:
             # Serialize lights separately
             lights_data = self._serialize_lights(scene, zipf)
             zipf.writestr("lights.json", json.dumps(lights_data, indent=2))
+
+            # Serialize portals separately
+            portals_data = self._serialize_portals(scene, zipf)
+            zipf.writestr("portals.json", json.dumps(portals_data, indent=2))
 
         logger.info(f"Scene successfully serialized to {zip_path}")
 
@@ -126,7 +131,7 @@ class SceneSerializer:
 
         # Recursively serialize children (skip lights - they're handled separately)
         for child in obj.children:
-            if not isinstance(child, (PointLight, DirectionalLight, RectangularLight)):
+            if not isinstance(child, (PointLight, DirectionalLight, RectangularLight, Portal)):
                 child_data = self._serialize_scene_object(child, zipf)
                 obj_data["children"].append(child_data)
 
@@ -287,6 +292,19 @@ class SceneSerializer:
 
         return lights_data
 
+    def _serialize_portals(self, scene: Scene, zipf: zipfile.ZipFile) -> Dict[str, Any]:
+        """Serialize all portals in the scene."""
+        portals_data = []
+        for portal in scene.portals:
+            portal_data = {
+                "name": portal.name,
+                "transform": self._serialize_transform(portal.transform),
+                "vertices": [[v.x, v.y, v.z] for v in portal.vertices],
+                "partner_name": portal.partner_name,
+            }
+            portals_data.append(portal_data)
+        return {"portals": portals_data}
+
     def deserialize_from_zip(self, zip_path: Path) -> Scene:
         """Deserialize a scene from a zip file.
 
@@ -320,6 +338,12 @@ class SceneSerializer:
                 with zipf.open("lights.json") as f:
                     lights_data = json.load(f)
                     self._deserialize_lights(lights_data, scene, zipf)
+
+            # Load portals separately
+            if "portals.json" in zipf.namelist():
+                with zipf.open("portals.json") as f:
+                    portals_data = json.load(f)
+                    self._deserialize_portals(portals_data, scene)
 
         logger.info(f"Scene successfully deserialized from {zip_path}")
         return scene
@@ -594,6 +618,22 @@ class SceneSerializer:
             )
             scene.add_object(light)
             scene.rectangular_lights.append(light)
+
+    def _deserialize_portals(
+        self, portals_data: Dict[str, Any], scene: Scene
+    ) -> None:
+        """Deserialize all portals and add them to the scene."""
+        for portal_data in portals_data.get("portals", []):
+            transform = self._deserialize_transform(portal_data["transform"])
+            vertices = [glm.vec3(v[0], v[1], v[2]) for v in portal_data["vertices"]]
+            portal = Portal(
+                name=portal_data["name"],
+                transform=transform,
+                vertices=vertices,
+                partner_name=portal_data["partner_name"],
+            )
+            scene.add_object(portal)
+            scene.portals.append(portal)
 
     def _update_lookup_recursive(
         self, obj: SceneObject, lookup: Dict[str, SceneObject]

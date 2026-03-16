@@ -6,6 +6,7 @@ import material;
 import model;
 import primitive;
 import light;
+import portal;
 import utils;
 import brdf;
 
@@ -55,6 +56,10 @@ public struct RendererUniform
     public bool enableFresnelEffect;
     // Seed for RNG
     public uint seed;
+    // Portals
+    public StructuredBuffer<Portal> portalBuf;
+    public uint portalCount;
+    public uint maxPortalTransports;
     // Debug flags.
     public bool renderDepth;
     public bool renderNormal;

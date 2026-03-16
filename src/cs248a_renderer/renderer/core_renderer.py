@@ -28,6 +28,7 @@ from cs248a_renderer.model.lights import (
     create_directional_light_buf,
     create_rectangular_light_buf,
 )
+from cs248a_renderer.model.portals import Portal, create_portal_buf
 
 
 class FilteringMethod(Enum):
@@ -74,6 +75,11 @@ class Renderer:
     _rectangular_light_buf: spy.NDBuffer | None
     _rectangular_light_count: int | None
 
+    # Portal Buffers
+    _portal_buf: spy.NDBuffer | None
+    _portal_count: int | None
+    _max_portal_transports: int
+
     # seed for RNG
     _seed: int | None
 
@@ -107,6 +113,7 @@ class Renderer:
             render_modules = RendererModules(device=device)
         self.primitive_module = render_modules.primitive_module
         self.light_module = render_modules.light_module
+        self.portal_module = render_modules.portal_module
         self.texture_module = render_modules.texture_module
         self.model_module = render_modules.model_module
         self.renderer_module = render_modules.renderer_module
@@ -196,6 +203,14 @@ class Renderer:
             shape=(1,),
         )
         self._rectangular_light_count = 0
+
+        self._portal_buf = spy.NDBuffer(
+            device=device,
+            dtype=self.portal_module.Portal.as_struct(),
+            shape=(1,),
+        )
+        self._portal_count = 0
+        self._max_portal_transports = 3
 
         self._seed = 0
         self._path_trace_depth = 1
@@ -311,6 +326,12 @@ class Renderer:
         )
         self._rectangular_light_count = len(rectangular_lights)
 
+    def load_portals(self, scene: Scene) -> None:
+        """Load portals into the renderer."""
+        portals = scene.extract_portals()
+        self._portal_buf = create_portal_buf(self.portal_module, portals)
+        self._portal_count = len(portals)
+
     def _build_render_uniforms(
         self,
         view_mat: glm.mat4,
@@ -405,6 +426,11 @@ class Renderer:
         if self._rectangular_light_buf is not None:
             uniforms["rectangularLightBuf"] = self._rectangular_light_buf
         uniforms["rectangularLightCount"] = self._rectangular_light_count
+
+        if self._portal_buf is not None:
+            uniforms["portalBuf"] = self._portal_buf
+        uniforms["portalCount"] = self._portal_count
+        uniforms["maxPortalTransports"] = self._max_portal_transports
 
         uniforms["seed"] = self._seed
         return uniforms
